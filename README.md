@@ -9,3 +9,7 @@
   <img align="center" height="40" width="50" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/docker/docker-original.svg">
   <img align="center" height="40" width="50" src="https://raw.githubusercontent.com/devicons/devicon/master/icons/terraform/terraform-original.svg">
   </div>
+
+<p> O Objetivo desse projeto, é automatizar o processo de criação e manutenção de máquina virtual onde sera hospedado os containters que irao rodar
+o WordPress, MySql, Jenkins e um CloudFlare
+</p>
