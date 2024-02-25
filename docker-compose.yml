@@ -1,0 +1,84 @@
+version: '3'
+
+services:
+  db:
+    image: mysql:latest
+    container_name: mysql-container
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: always
+    networks:
+      - wordpress_network
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${WORKER}
+         
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress-container
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
+    volumes:
+      - wordpress-html:/var/www/html
+    depends_on:
+      - db
+    ports:
+      - "8080:80"
+    restart: always
+    networks:
+      - wordpress_network
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == ${WORKER}
+
+  cloudflare:
+    image: cloudflare/cloudflare:latest
+    container_name: cloudflare_tunnel
+    environment:
+      tunnel: --no-update
+      token: 
+    deploy:
+      placement:
+        constraints:
+         - node.hostname == ${WORKER}
+    depends_on:
+      - wordpress
+    networks:
+      - wordpress_network
+
+
+  jenkins: 
+   image: jenkins:2.60.3-alpine
+   container_name: jenkins-container
+   ports:
+    - "8080:81"
+    - "50000:50000"
+   volumes: 
+   - ./jenkins:/var/jenkins_home
+   networks:
+   - wordpress_network
+   deploy:
+    placement:
+     constraints: 
+      - node.hostname == ${WORKER}
+
+
+volumes:
+  wordpress-html:
+   driver: local
+  mysql-data:
+   driver: local
+  jenkins:
+   driver: local
+
+networks:
+ wordpress_network:
