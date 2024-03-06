@@ -1,33 +1,67 @@
-variable "cloudinit_template_name" {
-  type = string
+resource "digitalocean_vpc" "vpc-wordpress" {
+  name   = "vpc-wordpress"
+  region = "nyc3"
 }
 
-variable "proxmox_node" {
-  type = string
+resource "digitalocean_droplet" "wordpress-vm" {
+  name     = "wordpress-vm-${count.index}"
+  size     = "s-1vcpu-1gb"
+  image    = "ubuntu-22-04-x64"
+  region   = "nyc3"
+  vpc_uuid = digitalocean_vpc.vpc-wordpress.id
+  count    = var.vm-wordpress-count
+  ssh_keys = [data.digitalocean_ssh_key.ssh_keys.id]
 }
 
-variable "ssh_keys" {
-  type = string
-  sensitive = true
+resource "digitalocean_droplet" "NFS_vm" {
+  name     = "NFS-vm"
+  size     = "s-1vcpu-1gb"
+  image    = "ubuntu-22-04-x64"
+  region   = "nyc3"
+  vpc_uuid = digitalocean_vpc.vpc-wordpress.id
+  ssh_keys = [data.digitalocean_ssh_key.ssh_keys.id]
 }
 
-resource "proxmox_vm_qemu" "Worker-01" {
-  count = 3
-  name = "Worker-01${count.index + 1}"
-  agent = 0
-  target_node = var.proxmox_node
-  bios = "seabios"
-  boot = "c"
-  cpu = "host"
-  hotplug = "network,disk,usb"
-  iso = "local:iso/debian-12.4.0-amd64-netinst.iso"
-  kvm = true
-  cores = 1
-  sockets = 1
-  memory = 512
-  numa = false
-  onboot = true
-  startup = ""
-  tablet = true
-  vmid = 102
+resource "digitalocean_database_mysql_config" "wp-mysql-database" {
+  cluster_id        = digitalocean_database_cluster.wp-mysql-database.id
+  connect_timeout   = 10
+  default_time_zone = "UTC"
+}
+
+resource "digitalocean_database_cluster" "wp-mysql-database" {
+  name       = "wp-mysql-database-mysql-cluster"
+  engine     = "mysql"
+  version    = "8"
+  size       = "db-s-1vcpu-1gb"
+  region     = "nyc3"
+  node_count = 1
+}
+
+resource "digitalocean_database_user" "wordpress" {
+  cluster_id = digitalocean_database_cluster.wp-mysql-database.id
+  name       = "wordpress"
+}
+
+resource "digitalocean_loadbalancer" "public" {
+  name   = "loadbalancer-1"
+  region = "nyc3"
+
+  forwarding_rule {
+    entry_port =  80
+    entry_protocol = "http"
+
+    target_port = 80
+    target_protocol = "http"
+  }
+
+  healthcheck {
+    port     = 22
+    protocol = "tcp"
+  }
+
+  droplet_ids = [digitalocean_droplet.wordpress-vm[0].id]
+}
+
+data "digitalocean_ssh_key" "ssh_keys" {
+  name = var.ssh_keys
 }
